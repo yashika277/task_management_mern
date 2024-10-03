@@ -1,28 +1,25 @@
-let mongoose = require("mongoose")
-let validator = require("validator")
+const mongoose = require('mongoose');
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken")
+
 
 const userSchema = new mongoose.Schema({
     name: {
         type: String,
-        required: [true, "Please Provide your Name"],
-        minLength: [3, "Name must contains at least 3 characters"],
-        maxLength: [30, "Name cannot exceed 30 characters"],
+        required: true,
     },
     email: {
         type: String,
-        required: [true, "please provide your email"],
-        unique: [true, "User Alredy registered"],
-        validate: [validator.isEmail, "Please Provide valid Email!"],
+        required: true,
+        unique: true,
     },
     phone: {
-        type: Number,
-        required: [true, "please provide your Phone Number"],
+        type: String,
+        required: true,
     },
     password: {
         type: String,
-        required: [true, "Please Provide your Password"],
-        minLength: [8, "password must contains at least 8 characters"],
-        maxLength: [32, "password cannot exceed 32 characters"],
+        required: true,
     },
     avatar: {
         public_id: {
@@ -34,12 +31,24 @@ const userSchema = new mongoose.Schema({
             required: true,
         },
     },
-    createdAt: {
-        type: Date,
-        default: Date.now,
+});
+userSchema.pre("save", async function () {
+    if (!this.isModified("password")) {
+        next()
     }
-})
+    this.password = await bcrypt.hash(this.password, 10);
+});
 
-let User = mongoose.model("userSchema", userSchema);
+userSchema.methods.comparePassword = async function (enteredPassword) {
+    return await bcrypt.compare(enteredPassword, this.password)
+}
 
-module.exports = User;
+userSchema.methods.getJWTToken = function (params) {
+    return jwt.sign({ id: this._id }, process.env.JWT_SECRET_KEY, {
+        expiresIn: process.env.JWT_EXPIRES,
+    })
+}
+
+const User = mongoose.model('User', userSchema);
+
+module.exports = { User };
